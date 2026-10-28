@@ -24,6 +24,10 @@ DATA_DIR = PIPELINE_ROOT / "data"
 # resolve_creation_date). Checked in, so a rebuild anywhere reproduces it.
 PINS_PATH = PIPELINE_ROOT / "build-pins.json"
 
+# Public repository with the conversion scripts and upstream source archives
+# of the GPL/AGPL dictionaries (FreeDict, GCIDE); their descriptions link it.
+DICTIONARY_SOURCES_URL = "https://github.com/naco-siren/OpenMDict-dictionary-sources"
+
 
 # ── Default flag lookup (matches iOS flagEmoji logic) ───────────
 FLAGS: dict[str, str] = {
@@ -374,3 +378,230 @@ def write_catalog_metadata(
         encoding='utf-8',
     )
     print(f"  Metadata: {meta_path}")
+
+
+# ── Dictionary descriptions (the MDX header's "Description") ────
+#
+# Every preset describes itself in one layout, so the app's dictionary
+# info screen (which renders this HTML) reads alike for all of them and
+# other MDict readers show the same credits:
+#
+#   <p><b>Title</b> (subtitle)</p>
+#   <p>about …</p>                one paragraph or more: the content, how
+#                                 to look things up, notation
+#   <p><b>Source:</b> …</p>       the upstream work: name, version or
+#                                 date, authors or copyright, links
+#   <p><b>License:</b> …</p>      the licence the upstream data is used
+#                                 under and the notices it requires
+#   <p><b>Conversion:</b> Sourced and converted to MDict by Naco Siren
+#       for OpenMDict: changes. adaptation licence. source code.</p>
+#   <p><small>…</small></p>       licence texts reproduced verbatim
+#
+# All arguments are HTML fragments: callers escape their own text
+# (shared.html.esc). The labels and the first sentence of the Conversion
+# paragraph are localized per description language (the Bibles describe
+# themselves in their own language): add a language to DESCRIPTION_LABELS
+# instead of writing the layout by hand.
+
+CONVERTER_NAME = "Naco Siren"
+CONVERTER_URL = "https://github.com/naco-siren"
+APP_NAME = "OpenMDict"
+
+# Per language: "sep" follows every label; the labels carry their own
+# punctuation; "converted" is the first sentence of the Conversion
+# paragraph without its final period, with {converter} and {app} filled
+# in by description_html(). Optional "converted_modified" is used instead
+# when a list of changes follows (the GPL and CC BY-SA ask for a notice
+# that the work was modified). Optional "colon" and "period" (default
+# ": " and ".") surround the list of changes for scripts with their own
+# punctuation.
+DESCRIPTION_LABELS: dict[str, dict[str, str]] = {
+    "en": {
+        "sep": " ",
+        "source": "Source:",
+        "license": "License:",
+        "conversion": "Conversion:",
+        "converted": "Sourced and converted to MDict by {converter} for {app}",
+        "converted_modified": "Sourced, converted to MDict and modified by {converter} for {app}",
+        "source_code": "Source code of this conversion:",
+    },
+    "zh-Hans": {
+        "sep": "",
+        "colon": "：",
+        "period": "。",
+        "source": "来源：",
+        "license": "许可证：",
+        "conversion": "转换：",
+        "converted": "由 {converter} 为 {app} 搜集并转换为 MDict 格式",
+        "source_code": "本次转换的源代码：",
+    },
+    "zh-Hant": {
+        "sep": "",
+        "colon": "：",
+        "period": "。",
+        "source": "來源：",
+        "license": "授權：",
+        "conversion": "轉換：",
+        "converted": "由 {converter} 為 {app} 蒐集並轉換為 MDict 格式",
+        "source_code": "本次轉換的原始碼：",
+    },
+    "ja": {
+        "sep": "",
+        "colon": "：",
+        "period": "。",
+        "source": "出典：",
+        "license": "ライセンス：",
+        "conversion": "変換：",
+        "converted": "{app} のために {converter} が収集し、MDict 形式に変換",
+        "source_code": "この変換のソースコード：",
+    },
+    "ko": {
+        "sep": " ",
+        "source": "출처:",
+        "license": "라이선스:",
+        "conversion": "변환:",
+        "converted": "{app}를 위해 {converter}이 수집하여 MDict 형식으로 변환",
+        "source_code": "이 변환의 소스 코드:",
+    },
+    "es": {
+        "sep": " ",
+        "source": "Fuente:",
+        "license": "Licencia:",
+        "conversion": "Conversión:",
+        "converted": "Obtenido y convertido a MDict por {converter} para {app}",
+        "source_code": "Código fuente de esta conversión:",
+    },
+    "fr": {
+        "sep": " ",
+        "source": "Source :",
+        "license": "Licence :",
+        "conversion": "Conversion :",
+        "converted": "Recueilli et converti en MDict par {converter} pour {app}",
+        "source_code": "Code source de cette conversion :",
+    },
+    "de": {
+        "sep": " ",
+        "source": "Quelle:",
+        "license": "Lizenz:",
+        "conversion": "Konvertierung:",
+        "converted": "Beschafft und nach MDict konvertiert von {converter} für {app}",
+        "source_code": "Quellcode dieser Konvertierung:",
+    },
+    "pt": {
+        "sep": " ",
+        "source": "Fonte:",
+        "license": "Licença:",
+        "conversion": "Conversão:",
+        "converted": "Obtido e convertido em MDict por {converter} para {app}",
+        "source_code": "Código-fonte desta conversão:",
+    },
+    "ru": {
+        "sep": " ",
+        "source": "Источник:",
+        "license": "Лицензия:",
+        "conversion": "Преобразование:",
+        "converted": "Собрано и преобразовано {converter} в формат MDict для {app}",
+        "source_code": "Исходный код этого преобразования:",
+    },
+    "ar": {
+        "sep": " ",
+        "source": "المصدر:",
+        "license": "الترخيص:",
+        "conversion": "التحويل:",
+        "converted": "جُمع وحُوِّل إلى صيغة MDict على يد {converter} من أجل {app}",
+        "source_code": "الشفرة المصدرية لهذا التحويل:",
+    },
+    "it": {
+        "sep": " ",
+        "source": "Fonte:",
+        "license": "Licenza:",
+        "conversion": "Conversione:",
+        "converted": "Reperito e convertito in MDict da {converter} per {app}",
+        "source_code": "Codice sorgente di questa conversione:",
+    },
+    "la": {
+        "sep": " ",
+        "source": "Fons:",
+        "license": "Licentia:",
+        "conversion": "Conversio:",
+        "converted": "{converter} pro {app} collegit et in MDict convertit",
+        "source_code": "Codex fontanus hujus conversionis:",
+    },
+    # Modern Greek: the language the Byzantine New Testament (lang "grc")
+    # describes itself in.
+    "grc": {
+        "sep": " ",
+        "source": "Πηγή:",
+        "license": "Άδεια:",
+        "conversion": "Μετατροπή:",
+        "converted": "Άντληση και μετατροπή σε μορφή MDict από {converter} για το {app}",
+        "source_code": "Πηγαίος κώδικας αυτής της μετατροπής:",
+    },
+}
+
+
+def converter_link() -> str:
+    """The converter's name linked to the public profile."""
+    return f'<a href="{CONVERTER_URL}">{CONVERTER_NAME}</a>'
+
+
+def description_html(
+    *,
+    title: str,
+    source: str,
+    license: str,
+    subtitle: str = "",
+    about: Iterable[str] = (),
+    changes: str = "",
+    adaptation_license: str = "",
+    source_code_url: str = "",
+    date: str = "",
+    notices: Iterable[str] = (),
+    lang: str = "en",
+) -> str:
+    """Compose a preset's header description in the shared layout.
+
+    Args (HTML fragments; escape plain text with ``shared.html.esc``):
+        title: Dictionary name, bold on the first line.
+        source: The upstream work: name, version or date, authors or
+            copyright holders, links.
+        license: The licence of the upstream data and any notice it
+            requires.
+        subtitle: Edition or release shown after the title in parentheses.
+        about: Paragraphs on the content and how to look things up.
+        changes: What the conversion changed, as a lower-case list without
+            a final period ("new layout, lookup keys for inflected forms").
+            Licences such as CC BY-SA require it.
+        adaptation_license: Sentence(s) on the licence of the converted
+            file ("This adaptation is licensed under <a …>CC BY-SA 4.0</a>.").
+        source_code_url: Where the conversion's source code is published
+            (the GPL/AGPL dictionaries: DICTIONARY_SOURCES_URL).
+        date: Month or date of the conversion ("October 2026"). Keep it a
+            constant in the build script: the header must be reproducible.
+        notices: Licence texts reproduced verbatim, shown small.
+        lang: Language of the description, a key of DESCRIPTION_LABELS.
+    """
+    labels = DESCRIPTION_LABELS[lang]
+    sep = labels["sep"]
+    head = f"<b>{title}</b>"
+    if subtitle:
+        head += f" ({subtitle})"
+    parts = [f"<p>{head}</p>"]
+    parts += [f"<p>{p}</p>" for p in about if p]
+    parts.append(f"<p><b>{labels['source']}</b>{sep}{source}</p>")
+    parts.append(f"<p><b>{labels['license']}</b>{sep}{license}</p>")
+    sentence = labels.get("converted_modified", labels["converted"]) if changes else labels["converted"]
+    converted = sentence.format(converter=converter_link(), app=APP_NAME)
+    if date:
+        converted += f" ({date})"
+    colon, period = labels.get("colon", ": "), labels.get("period", ".")
+    conversion = converted + (f"{colon}{changes}{period}" if changes else period)
+    if adaptation_license:
+        conversion += f" {adaptation_license}"
+    if source_code_url:
+        shown = re.sub(r"^https?://", "", source_code_url)
+        conversion += (f" {labels['source_code']}{sep}"
+                       f'<a href="{source_code_url}">{shown}</a>.')
+    parts.append(f"<p><b>{labels['conversion']}</b>{sep}{conversion}</p>")
+    parts += [f"<p><small>{n}</small></p>" for n in notices if n]
+    return "".join(parts)

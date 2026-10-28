@@ -39,6 +39,7 @@ import re
 import sys
 import unicodedata
 from collections import Counter, defaultdict
+from datetime import datetime
 from pathlib import Path
 
 # ── Shared infrastructure ─────────────────────────────────────
@@ -48,7 +49,8 @@ sys.path.insert(0, str(SCRIPT_DIR))
 from shared.theme import get_css, PRONUNCIATION, ETYMOLOGY, DEFINITION, \
     SENSE_NUMBER, EXAMPLES, SYNONYMS, TEXT_SECONDARY, TEXT_LINK
 from shared.html import esc, esc_attr, dir_label
-from shared.build import pack_mdx, generate_preview, write_catalog_metadata
+from shared.build import (pack_mdx, generate_preview, write_catalog_metadata,
+                          description_html, DICTIONARY_SOURCES_URL)
 
 # ── Paths ──────────────────────────────────────────────────────
 GCIDE_VERSION = "0.53"
@@ -95,7 +97,21 @@ SOURCE_FIXES = {
     'W': [('<hw>wan"na</hw> <pr>(w<ocr/n"n<ucr/*b<emac/`)</pr>',
            '<hw>wan"na*be`</hw> <pr>(w<ocr/n"n<ucr/*b<emac/`)</pr>')],
     'F': [('<hw>frits` out"</hw>', '<hw>fritz` out"</hw>')],
+    # Two entries upstream has as commented-out drafts, kept as entries.
+    'S': [('<-- <hw>shoo-in</hw>  <def>a candidate who is certain to win easily.</def> --><br/',
+           '<hw>shoo-in</hw>  <def>a candidate who is certain to win easily.</def><br/')],
 }
+SOURCE_FIXES['W'] += [
+    ('<-- <hw>water jacket</hw>.  A chamber surrounding a vessel or tube in which water '
+     'may be circulated, thereby regulating the temperature or supply of heat to the '
+     'vessel.  Used in laboratory and manufacturing equipment.<br/',
+     '<hw>water jacket</hw>.  <def>A chamber surrounding a vessel or tube in which water '
+     'may be circulated, thereby regulating the temperature or supply of heat to the '
+     'vessel.  Used in laboratory and manufacturing equipment.</def><br/'),
+    ('<p>  water-jacketed.  adj. Having a water jacket; -- as, a water-jacketed condenser. --><br/',
+     '<p><hw>water-jacketed</hw>, <pos>a.</pos> <def>Having a water jacket; -- as, '
+     'a water-jacketed condenser.</def><br/'),
+]
 SOURCE_FIXES_UNUSED: list[str] = []
 
 
@@ -2115,53 +2131,79 @@ SAMPLE_WORDS = ['abandon', 'apron', 'take', 'alone', 'theater', 'eclat', 'myth',
                 'aerobic', 'let alone', 'unabashed']
 
 TITLE = "GCIDE — GNU Collaborative International Dictionary of English"
+MDX_NAME = "GCIDE-EN.mdx"
+MODIFIED_DATE = '2026-10-21'
+# The header description shows the conversion month (strftime's %B in the
+# default C locale gives the English month name).
+MODIFIED_MONTH = datetime.strptime(MODIFIED_DATE, '%Y-%m-%d').strftime('%B %Y')
+
+# The WordNet 1.5 notice: Princeton asks for its notice and disclaimer on
+# ALL copies.
+WORDNET_15_NOTICE = (
+    "WordNet 1.5 Copyright 1995 by Princeton University. All rights reserved. "
+    "Permission to use, copy, modify and distribute this software and database and its "
+    "documentation for any purpose and without fee or royalty is hereby granted, provided "
+    "that you agree to comply with the following copyright notice and statements, including "
+    "the disclaimer, and that the same appear on ALL copies of the software, database and "
+    "documentation, including modifications that you make for internal use or for "
+    "distribution. THIS SOFTWARE AND DATABASE IS PROVIDED \"AS IS\" AND PRINCETON "
+    "UNIVERSITY MAKES NO REPRESENTATIONS OR WARRANTIES, EXPRESS OR IMPLIED. BY WAY OF "
+    "EXAMPLE, BUT NOT LIMITATION, PRINCETON UNIVERSITY MAKES NO REPRESENTATIONS OR "
+    "WARRANTIES OF MERCHANTABILITY OR FITNESS FOR ANY PARTICULAR PURPOSE OR THAT THE USE "
+    "OF THE LICENSED SOFTWARE, DATABASE OR DOCUMENTATION WILL NOT INFRINGE ANY THIRD PARTY "
+    "PATENTS, COPYRIGHTS, TRADEMARKS OR OTHER RIGHTS. The name of Princeton University or "
+    "Princeton may not be used in advertising or publicity pertaining to distribution of "
+    "the software and/or database. Title to copyright in this software, database and any "
+    "associated documentation shall at all times remain with Princeton University and "
+    "LICENSEE agrees to preserve same."
+)
 
 
-def description_html(build_date: str) -> str:
-    return (
-        f"<p><b>{TITLE}</b></p>"
-        f"<p>GCIDE {GCIDE_VERSION}, Copyright © 1992–2021 Patrick J. Cassidy. "
-        "Based on Webster’s Revised Unabridged Dictionary (G. &amp; C. Merriam Co., 1913) "
-        "with additions from WordNet 1.5 (WordNet 1.5 Copyright © 1995 Princeton University, "
-        "<a href='https://wordnet.princeton.edu/license-and-commercial-use'>license</a>), "
-        "proof-read and supplemented by volunteers. Definitions, etymologies, literary "
-        "quotations, phrases, and pronunciation where available.</p>"
-        "<p>Source: <a href='https://www.gnu.org/software/gcide/'>www.gnu.org/software/gcide</a> "
-        f"(<a href='https://ftp.gnu.org/gnu/gcide/'>gcide-{GCIDE_VERSION}.tar.xz</a>).</p>"
-        "<p>GCIDE is free; you can redistribute it and/or modify it under the terms "
-        "of the GNU General Public License as published by the Free Software Foundation; "
-        "either version 3, or (at your option) any later version "
-        "(<a href='https://www.gnu.org/licenses/gpl-3.0.html'>GPL-3.0-or-later</a>). "
-        "It is distributed WITHOUT ANY WARRANTY; without even the implied warranty of "
-        "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.</p>"
-        f"<p>Converted to MDict and modified by OpenMDict on {build_date}: reformatted "
-        "as HTML, Greek transliterations converted to Greek script, stress marks shown "
-        "as ˈ (primary) and ˌ (secondary) before the stressed syllable, cross-references "
-        "linked, and lookup keys added for variant spellings, inflected forms and "
-        "phrases. ‖ marks a foreign word not naturalized in English; "
-        "<span style='border:1px solid #c7c7cc;border-radius:3px;padding:0 2px'>?</span> "
-        "marks a character not legible in the source.</p>"
-        # Princeton asks for its notice and disclaimer on ALL copies.
-        "<p><small>WordNet 1.5 Copyright 1995 by Princeton University. All rights reserved. "
-        "Permission to use, copy, modify and distribute this software and database and its "
-        "documentation for any purpose and without fee or royalty is hereby granted, provided "
-        "that you agree to comply with the following copyright notice and statements, including "
-        "the disclaimer, and that the same appear on ALL copies of the software, database and "
-        "documentation, including modifications that you make for internal use or for "
-        "distribution. THIS SOFTWARE AND DATABASE IS PROVIDED \"AS IS\" AND PRINCETON "
-        "UNIVERSITY MAKES NO REPRESENTATIONS OR WARRANTIES, EXPRESS OR IMPLIED. BY WAY OF "
-        "EXAMPLE, BUT NOT LIMITATION, PRINCETON UNIVERSITY MAKES NO REPRESENTATIONS OR "
-        "WARRANTIES OF MERCHANTABILITY OR FITNESS FOR ANY PARTICULAR PURPOSE OR THAT THE USE "
-        "OF THE LICENSED SOFTWARE, DATABASE OR DOCUMENTATION WILL NOT INFRINGE ANY THIRD PARTY "
-        "PATENTS, COPYRIGHTS, TRADEMARKS OR OTHER RIGHTS. The name of Princeton University or "
-        "Princeton may not be used in advertising or publicity pertaining to distribution of "
-        "the software and/or database. Title to copyright in this software, database and any "
-        "associated documentation shall at all times remain with Princeton University and "
-        "LICENSEE agrees to preserve same.</small></p>"
+def header_description() -> str:
+    """The MDX header description, in the shared preset layout."""
+    return description_html(
+        title=TITLE,
+        about=[
+            "Based on Webster’s Revised Unabridged Dictionary (G. &amp; C. Merriam Co., 1913) "
+            "with additions from WordNet 1.5, proof-read and supplemented by volunteers. "
+            "Definitions, etymologies, literary quotations, phrases, and pronunciation "
+            "where available.",
+            "‖ marks a foreign word not naturalized in English; "
+            '<span style="border:1px solid #c7c7cc;border-radius:3px;padding:0 2px">?</span> '
+            "marks a character not legible in the source.",
+        ],
+        source=(
+            f"GCIDE {GCIDE_VERSION}, Copyright © 1992–2021 Patrick J. Cassidy; "
+            '<a href="https://www.gnu.org/software/gcide/">www.gnu.org/software/gcide</a> '
+            f'(<a href="https://ftp.gnu.org/gnu/gcide/">gcide-{GCIDE_VERSION}.tar.xz</a>). '
+            "WordNet 1.5 Copyright © 1995 Princeton University "
+            '(<a href="https://wordnet.princeton.edu/license-and-commercial-use">license</a>).'
+        ),
+        license=(
+            "GCIDE is free; you can redistribute it and/or modify it under the terms "
+            "of the GNU General Public License as published by the Free Software Foundation; "
+            "either version 3, or (at your option) any later version "
+            '(<a href="https://www.gnu.org/licenses/gpl-3.0.html">GPL-3.0-or-later</a>). '
+            "It is distributed WITHOUT ANY WARRANTY; without even the implied warranty of "
+            "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+        ),
+        changes=(
+            "reformatted as HTML, Greek transliterations converted to Greek script, "
+            "stress marks shown as ˈ (primary) and ˌ (secondary) before the stressed "
+            "syllable, cross-references linked, and lookup keys added for variant "
+            "spellings, inflected forms and phrases"
+        ),
+        source_code_url=DICTIONARY_SOURCES_URL,
+        date=MODIFIED_MONTH,
+        notices=[WORDNET_15_NOTICE],
     )
 
 
-MODIFIED_DATE = '2026-10-20'
+def descriptions() -> dict[str, str]:
+    """Header description of every MDX this script builds, without building."""
+    return {MDX_NAME: header_description()}
+
+
 STRICT = True      # content checks fail the build
 
 
@@ -2343,8 +2385,8 @@ def main():
           f"{n_redirects:,} redirects; {stats['links']:,} links, "
           f"{stats['er_unresolved']:,} unresolved cross-references")
 
-    mdx_path = OUTPUT_DIR / "GCIDE-EN.mdx"
-    success, size_mb, _ = pack_mdx(txt_path, TITLE, description_html(MODIFIED_DATE),
+    mdx_path = OUTPUT_DIR / MDX_NAME
+    success, size_mb, _ = pack_mdx(txt_path, TITLE, descriptions()[MDX_NAME],
                                    mdx_path, inputs=[DATA_DIR])
     if not success:
         raise SystemExit(1)
